@@ -4,11 +4,17 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:motungi/screens/auth/auth_screen.dart';
 import 'package:motungi/theme/app_theme.dart';
 
+AuthScreen _authScreen() => AuthScreen(
+  onAuth: (_) {},
+  onSignout: () {},
+  onClose: () {},
+);
+
 void main() {
   testWidgets('AuthScreen shows email field and social buttons', (tester) async {
     await tester.pumpWidget(ProviderScope(child: MaterialApp(
       theme: buildTheme(),
-      home: const AuthScreen(),
+      home: _authScreen(),
     )));
     expect(find.byType(TextField), findsWidgets);
     expect(find.text('Apple로 계속'), findsOneWidget);
@@ -19,7 +25,7 @@ void main() {
   testWidgets('submit button disabled when email invalid', (tester) async {
     await tester.pumpWidget(ProviderScope(child: MaterialApp(
       theme: buildTheme(),
-      home: const AuthScreen(),
+      home: _authScreen(),
     )));
     final btn = tester.widget<GestureDetector>(
       find.ancestor(of: find.text('로그인'), matching: find.byType(GestureDetector)).first,
@@ -28,23 +34,23 @@ void main() {
   });
 
   testWidgets('mode toggles between login and signup', (tester) async {
-    addTearDown(tester.binding.window.clearPhysicalSizeTestValue);
-    tester.binding.window.physicalSizeTestValue = const Size(800, 1600);
+    addTearDown(tester.view.resetPhysicalSize);
+    tester.view.physicalSize = const Size(800, 1600);
 
     await tester.pumpWidget(ProviderScope(child: MaterialApp(
       theme: buildTheme(),
-      home: const AuthScreen(),
+      home: _authScreen(),
     )));
-    expect(find.text('처음이신가요?'), findsOneWidget);
+    expect(find.text('계정이 없으신가요?'), findsOneWidget);
 
     // Scroll to bottom to find the toggle button
     await tester.dragUntilVisible(
-      find.text('회원가입'),
+      find.text('가입하기'),
       find.byType(SingleChildScrollView),
       const Offset(0, -300),
     );
 
-    await tester.tap(find.text('회원가입'));
+    await tester.tap(find.text('가입하기'));
     await tester.pumpAndSettle();
     expect(find.text('이미 계정이 있나요?'), findsOneWidget);
   });

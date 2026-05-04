@@ -1,124 +1,388 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../data/headlines.dart';
 import '../../logic/route_engine.dart';
-import '../../theme/app_colors.dart';
+import '../../theme/t.dart';
 import '../../theme/app_text_styles.dart';
 import 'widgets/option_bar.dart';
 import 'widgets/course_card.dart';
 
-final _homeStateProvider = StateNotifierProvider<_HomeNotifier, _HomeState>((ref) => _HomeNotifier());
+// ── State ────────────────────────────────────────────────────────────────────
 
-class _HomeState {
-  final int duration;
-  final String mood;
-  final String purpose;
+class HomeState {
+  final int dur;
+  final String mood;   // 고요 | 활기 | 즉흥
+  final String purp;   // 회복 | 환기 | 사색 | 탐험
   final int seed;
-  const _HomeState({this.duration=15, this.mood='quiet', this.purpose='recovery', this.seed=0});
-  _HomeState copyWith({int? duration, String? mood, String? purpose, int? seed}) =>
-    _HomeState(duration: duration??this.duration, mood: mood??this.mood, purpose: purpose??this.purpose, seed: seed??this.seed);
+  final bool showOptions;
+  final bool showCustom;
+  final String custom;
+  final bool swapping;
+
+  const HomeState({
+    this.dur = 20,
+    this.mood = '활기',
+    this.purp = '회복',
+    this.seed = 0,
+    this.showOptions = false,
+    this.showCustom = false,
+    this.custom = '',
+    this.swapping = false,
+  });
+
+  HomeState copyWith({
+    int? dur,
+    String? mood,
+    String? purp,
+    int? seed,
+    bool? showOptions,
+    bool? showCustom,
+    String? custom,
+    bool? swapping,
+  }) =>
+      HomeState(
+        dur: dur ?? this.dur,
+        mood: mood ?? this.mood,
+        purp: purp ?? this.purp,
+        seed: seed ?? this.seed,
+        showOptions: showOptions ?? this.showOptions,
+        showCustom: showCustom ?? this.showCustom,
+        custom: custom ?? this.custom,
+        swapping: swapping ?? this.swapping,
+      );
+
+  /// Effective duration: custom input when valid, otherwise preset
+  int get effectiveDur =>
+      showCustom && custom.isNotEmpty
+          ? (int.tryParse(custom) ?? dur).clamp(3, 60)
+          : dur;
+
+  /// English mood key for route engine
+  String get moodEn {
+    const map = {'고요': 'quiet', '활기': 'lively', '즉흥': 'spontaneous'};
+    return map[mood] ?? 'lively';
+  }
+
+  /// English purpose key for route engine
+  String get purpEn {
+    const map = {'회복': 'recovery', '환기': 'clearing', '사색': 'reflection', '탐험': 'exploration'};
+    return map[purp] ?? 'recovery';
+  }
 }
 
-class _HomeNotifier extends StateNotifier<_HomeState> {
-  _HomeNotifier() : super(const _HomeState());
-  void setDuration(int v) => state = state.copyWith(duration: v);
-  void setMood(String v)  => state = state.copyWith(mood: v);
-  void setPurpose(String v) => state = state.copyWith(purpose: v);
+class _HomeNotifier extends StateNotifier<HomeState> {
+  _HomeNotifier() : super(const HomeState());
+
+  void setDur(int v) => state = state.copyWith(dur: v);
+  void setMood(String v) => state = state.copyWith(mood: v);
+  void setPurp(String v) => state = state.copyWith(purp: v);
+  void setCustom(String v) => state = state.copyWith(custom: v);
+  void toggleOptions() =>
+      state = state.copyWith(showOptions: !state.showOptions);
+  void toggleCustom() =>
+      state = state.copyWith(showCustom: !state.showCustom, custom: '');
   void swap() => state = state.copyWith(seed: state.seed + 1);
 }
 
+final _homeStateProvider =
+    StateNotifierProvider<_HomeNotifier, HomeState>((_) => _HomeNotifier());
+
+// ── HomeScreen ───────────────────────────────────────────────────────────────
+
 class HomeScreen extends ConsumerWidget {
-  const HomeScreen({super.key});
+  final List<Map<String, dynamic>> logs;
+  final bool hasWalkedToday;
+  final int defaultDur;
+  final String neighborhood;
+  final String locationName;
+  final void Function(Map<String, dynamic> walkData) onStart;
+  final void Function(String tab) onTab;
+  final VoidCallback onSettings;
+
+  const HomeScreen({
+    super.key,
+    this.logs = const [],
+    this.hasWalkedToday = false,
+    this.defaultDur = 20,
+    this.neighborhood = '서울',
+    this.locationName = '홈',
+    this.onStart = _noop,
+    this.onTab = _noopTab,
+    this.onSettings = _noopVoid,
+  });
+
+  static void _noop(Map<String, dynamic> _) {}
+  static void _noopTab(String _) {}
+  static void _noopVoid() {}
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final s = ref.watch(_homeStateProvider);
     final notifier = ref.read(_homeStateProvider.notifier);
-    final route = getRoute(duration: s.duration, mood: s.mood, purpose: s.purpose, seed: s.seed);
 
-    return Scaffold(
-      backgroundColor: AppColors.paper,
-      body: SafeArea(child: Column(children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16,16,16,4),
-          child: Text(_headline(), style: AppTextStyles.headline(AppColors.ink)),
-        ),
-        OptionBar(
-          duration: s.duration, mood: s.mood, purpose: s.purpose,
-          onDurationChanged: notifier.setDuration,
-          onMoodChanged: notifier.setMood,
-          onPurposeChanged: notifier.setPurpose,
-        ),
-        Expanded(child: SingleChildScrollView(
-          child: Column(children: [
-            const SizedBox(height: 8),
-            AnimatedSwitcher(
-              duration: const Duration(milliseconds: 220),
-              transitionBuilder: (child, anim) => FadeTransition(opacity: anim,
-                child: SlideTransition(position: Tween(begin: const Offset(0,.04), end: Offset.zero).animate(anim), child: child)),
-              child: KeyedSubtree(
-                key: ValueKey('${s.duration}_${s.mood}_${s.purpose}_${s.seed}'),
-                child: CourseCard(route: route, duration: s.duration, mood: s.mood),
+    final route = getRoute(
+      duration: s.effectiveDur,
+      mood: s.moodEn,
+      purpose: s.purpEn,
+      seed: s.seed,
+    );
+
+    final headline = getHeadline(hasWalkedToday);
+    final now = DateTime.now();
+    final dateStr =
+        '${now.year}.${now.month.toString().padLeft(2, '0')}.${now.day.toString().padLeft(2, '0')}';
+    final dayStr = kDayKor[now.weekday % 7];
+
+    return ValueListenableBuilder<AppThemeTokens>(
+      valueListenable: themeTokensNotifier,
+      builder: (context, t, _) {
+        return Scaffold(
+          backgroundColor: t.bg,
+          body: SafeArea(
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // 1. TopBar
+                  _TopBar(
+                    dateStr: dateStr,
+                    dayStr: dayStr,
+                    locationName: locationName,
+                    t: t,
+                    onSettings: onSettings,
+                  ),
+
+                  // 2. Headline greeting
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(24, 18, 24, 0),
+                    child: _Headline(headline: headline, t: t),
+                  ),
+
+                  // 3. Course Card
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(24, 16, 24, 0),
+                    child: AnimatedOpacity(
+                      opacity: s.swapping ? 0.0 : 1.0,
+                      duration: const Duration(milliseconds: 200),
+                      child: AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 220),
+                        transitionBuilder: (child, anim) => FadeTransition(
+                          opacity: anim,
+                          child: child,
+                        ),
+                        child: KeyedSubtree(
+                          key: ValueKey(
+                              '${s.effectiveDur}_${s.mood}_${s.purp}_${s.seed}'),
+                          child: CourseCard(
+                            route: route,
+                            duration: s.effectiveDur,
+                            mood: s.mood,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  // 4. AdjustBar
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(24, 14, 24, 0),
+                    child: AdjustBar(
+                      dur: s.dur,
+                      mood: s.mood,
+                      purp: s.purp,
+                      showOptions: s.showOptions,
+                      showCustom: s.showCustom,
+                      custom: s.custom,
+                      onToggleOptions: notifier.toggleOptions,
+                      onSwap: notifier.swap,
+                      onDurChanged: notifier.setDur,
+                      onMoodChanged: notifier.setMood,
+                      onPurpChanged: notifier.setPurp,
+                      onToggleCustom: notifier.toggleCustom,
+                      onCustomChanged: notifier.setCustom,
+                    ),
+                  ),
+
+                  // 5. CTA button
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(24, 14, 24, 0),
+                    child: _CtaButton(
+                      mood: s.mood,
+                      t: t,
+                      onTap: () => onStart({
+                        'dur': s.effectiveDur,
+                        'mood': s.moodEn,
+                        'purpose': s.purpEn,
+                        'seed': s.seed,
+                        'flavorName': route.flavorName,
+                        'flavorDesc': route.flavorDesc,
+                        'distanceKm': route.distanceKm,
+                      }),
+                    ),
+                  ),
+
+                  // 6. Past walks link
+                  if (logs.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(24, 14, 24, 0),
+                      child: GestureDetector(
+                        onTap: () => onTab('logs'),
+                        child: Text(
+                          '지난 산책 ${logs.length}개 →',
+                          style: Ts.sans(13, FontWeight.w400, t.copperD)
+                              .copyWith(
+                                  decoration: TextDecoration.underline,
+                                  decorationColor: t.copperD),
+                        ),
+                      ),
+                    ),
+
+                  const SizedBox(height: 32),
+                ],
               ),
             ),
-            const SizedBox(height: 16),
-            Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-              _OutlineButton(label: '다른 길', onTap: notifier.swap),
-              const SizedBox(width: 12),
-              _FilledButton(label: '산책 시작', onTap: () {}),
-            ]),
-            const SizedBox(height: 24),
-          ]),
-        )),
-      ])),
+          ),
+        );
+      },
     );
   }
+}
 
-  String _headline() {
-    final h = DateTime.now().hour;
-    if (h < 6)  return '깊은 밤의 걸음';
-    if (h < 11) return '아침이 왔습니다';
-    if (h < 14) return '점심 산책 어때요';
-    if (h < 17) return '오후의 햇살';
-    if (h < 19) return '황금빛 시간이에요';
-    if (h < 22) return '저녁 산책 시간';
-    return '밤의 동네';
+// ── TopBar ───────────────────────────────────────────────────────────────────
+
+class _TopBar extends StatelessWidget {
+  final String dateStr;
+  final String dayStr;
+  final String locationName;
+  final AppThemeTokens t;
+  final VoidCallback onSettings;
+
+  const _TopBar({
+    required this.dateStr,
+    required this.dayStr,
+    required this.locationName,
+    required this.t,
+    required this.onSettings,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        border: Border(
+          bottom: BorderSide(color: t.rule),
+        ),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text.rich(
+              TextSpan(
+                children: [
+                  TextSpan(
+                    text: dateStr,
+                    style: TextStyle(
+                      fontFeatures: const [FontFeature.tabularFigures()],
+                      fontWeight: FontWeight.w800,
+                      fontSize: 13,
+                      color: t.ink,
+                    ),
+                  ),
+                  TextSpan(
+                    text: ' · $dayStr요일 · $locationName',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 13,
+                      color: t.ink2,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          GestureDetector(
+            onTap: onSettings,
+            child: Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: t.paper2,
+                border: Border.all(color: t.rule),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(Icons.settings_outlined, size: 18, color: t.ink2),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 
-class _OutlineButton extends StatelessWidget {
-  final String label;
-  final VoidCallback onTap;
-  const _OutlineButton({required this.label, required this.onTap});
+// ── Headline ─────────────────────────────────────────────────────────────────
+
+class _Headline extends StatelessWidget {
+  final HeadlineParts headline;
+  final AppThemeTokens t;
+
+  const _Headline({required this.headline, required this.t});
 
   @override
-  Widget build(BuildContext context) => GestureDetector(
-    onTap: onTap,
-    child: Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-      decoration: BoxDecoration(
-        border: Border.all(color: AppColors.ink),
-        borderRadius: BorderRadius.circular(24),
+  Widget build(BuildContext context) {
+    return Text.rich(
+      TextSpan(
+        style: Ts.serif(18, FontWeight.w400, t.ink2),
+        children: [
+          TextSpan(text: '${headline.l1} '),
+          TextSpan(
+            text: headline.a,
+            style: TextStyle(color: t.copper, fontWeight: FontWeight.w700),
+          ),
+          TextSpan(
+            text: ' ${headline.l2}',
+            style: TextStyle(color: t.ink),
+          ),
+        ],
       ),
-      child: Text(label, style: AppTextStyles.body(AppColors.ink)),
-    ),
-  );
+    );
+  }
 }
 
-class _FilledButton extends StatelessWidget {
-  final String label;
+// ── CTA button ───────────────────────────────────────────────────────────────
+
+class _CtaButton extends StatelessWidget {
+  final String mood;
+  final AppThemeTokens t;
   final VoidCallback onTap;
-  const _FilledButton({required this.label, required this.onTap});
+
+  const _CtaButton({
+    required this.mood,
+    required this.t,
+    required this.onTap,
+  });
 
   @override
-  Widget build(BuildContext context) => GestureDetector(
-    onTap: onTap,
-    child: Container(
-      padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 12),
-      decoration: BoxDecoration(
-        color: AppColors.ink,
-        borderRadius: BorderRadius.circular(24),
+  Widget build(BuildContext context) {
+    final label = mood == '즉흥'
+        ? '출발 — 길은 그때 정해집니다'
+        : '이 길로 걷기';
+
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: double.infinity,
+        decoration: BoxDecoration(
+          color: t.ink,
+          borderRadius: BorderRadius.circular(6),
+        ),
+        padding: const EdgeInsets.symmetric(vertical: 17),
+        alignment: Alignment.center,
+        child: Text(
+          label,
+          style: Ts.sans(15, FontWeight.w800, t.paper),
+        ),
       ),
-      child: Text(label, style: AppTextStyles.body(AppColors.paper)),
-    ),
-  );
+    );
+  }
 }

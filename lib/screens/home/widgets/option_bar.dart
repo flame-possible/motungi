@@ -1,126 +1,409 @@
 import 'package:flutter/material.dart';
-import '../../../theme/app_colors.dart';
+import 'package:flutter/services.dart';
+import '../../../theme/t.dart';
 import '../../../theme/app_text_styles.dart';
 
-class OptionBar extends StatelessWidget {
-  final int duration;
-  final String mood;
-  final String purpose;
-  final ValueChanged<int> onDurationChanged;
+// ── Public callback interface ───────────────────────────────────────────────
+class AdjustBar extends StatelessWidget {
+  final int dur;
+  final String mood;   // 고요 | 활기 | 즉흥
+  final String purp;   // 회복 | 환기 | 사색 | 탐험
+  final bool showOptions;
+  final bool showCustom;
+  final String custom;
+  final VoidCallback onToggleOptions;
+  final VoidCallback onSwap;
+  final ValueChanged<int> onDurChanged;
   final ValueChanged<String> onMoodChanged;
-  final ValueChanged<String> onPurposeChanged;
+  final ValueChanged<String> onPurpChanged;
+  final VoidCallback onToggleCustom;
+  final ValueChanged<String> onCustomChanged;
 
-  const OptionBar({
+  const AdjustBar({
     super.key,
-    required this.duration,
+    required this.dur,
     required this.mood,
-    required this.purpose,
-    required this.onDurationChanged,
+    required this.purp,
+    required this.showOptions,
+    required this.showCustom,
+    required this.custom,
+    required this.onToggleOptions,
+    required this.onSwap,
+    required this.onDurChanged,
     required this.onMoodChanged,
-    required this.onPurposeChanged,
+    required this.onPurpChanged,
+    required this.onToggleCustom,
+    required this.onCustomChanged,
   });
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+    return ValueListenableBuilder<AppThemeTokens>(
+      valueListenable: themeTokensNotifier,
+      builder: (context, t, _) {
+        return showOptions
+            ? _ExpandedBar(
+                dur: dur,
+                mood: mood,
+                purp: purp,
+                showCustom: showCustom,
+                custom: custom,
+                t: t,
+                onToggleOptions: onToggleOptions,
+                onSwap: onSwap,
+                onDurChanged: onDurChanged,
+                onMoodChanged: onMoodChanged,
+                onPurpChanged: onPurpChanged,
+                onToggleCustom: onToggleCustom,
+                onCustomChanged: onCustomChanged,
+              )
+            : _CollapsedBar(
+                dur: dur,
+                mood: mood,
+                purp: purp,
+                t: t,
+                onToggleOptions: onToggleOptions,
+                onSwap: onSwap,
+              );
+      },
+    );
+  }
+}
+
+// ── Collapsed state ─────────────────────────────────────────────────────────
+class _CollapsedBar extends StatelessWidget {
+  final int dur;
+  final String mood;
+  final String purp;
+  final AppThemeTokens t;
+  final VoidCallback onToggleOptions;
+  final VoidCallback onSwap;
+
+  const _CollapsedBar({
+    required this.dur,
+    required this.mood,
+    required this.purp,
+    required this.t,
+    required this.onToggleOptions,
+    required this.onSwap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: t.paper2,
+        border: Border.all(color: t.ruleSoft),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      clipBehavior: Clip.hardEdge,
       child: Row(
         children: [
-          ...[5, 10, 15, 20, 30].map((d) => _chip(
-            '${d}분',
-            selected: duration == d,
-            onTap: () => onDurationChanged(d),
-          )),
-          _CustomDurationChip(duration: duration, onChanged: onDurationChanged),
-          const SizedBox(width: 8),
-          _divider(),
-          const SizedBox(width: 8),
-          ...['quiet', 'lively', 'spontaneous'].map((m) => _chip(
-            _moodLabel(m),
-            selected: mood == m,
-            onTap: () => onMoodChanged(m),
-          )),
-          const SizedBox(width: 8),
-          _divider(),
-          const SizedBox(width: 8),
-          ...['recovery', 'clearing', 'reflection', 'exploration'].map((p) =>
-            _chip(
-              _purposeLabel(p),
-              selected: purpose == p,
-              onTap: () => onPurposeChanged(p),
-            )),
+          // Left: current settings summary
+          Expanded(
+            child: GestureDetector(
+              onTap: onToggleOptions,
+              behavior: HitTestBehavior.opaque,
+              child: Container(
+                height: 48,
+                decoration: BoxDecoration(
+                  border: Border(
+                    right: BorderSide(color: t.ruleSoft),
+                  ),
+                ),
+                padding: const EdgeInsets.symmetric(horizontal: 14),
+                alignment: Alignment.centerLeft,
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        '$dur분 · $mood · $purp',
+                        style: Ts.sans(13, FontWeight.w400, t.ink2),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      '조정→',
+                      style: Ts.sans(12, FontWeight.w700, t.copperD),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          // Right: swap button
+          GestureDetector(
+            onTap: onSwap,
+            behavior: HitTestBehavior.opaque,
+            child: SizedBox(
+              width: 48,
+              height: 48,
+              child: Center(
+                child: Text(
+                  '↻',
+                  style: TextStyle(fontSize: 20, color: t.ink),
+                ),
+              ),
+            ),
+          ),
         ],
       ),
     );
   }
+}
 
-  Widget _chip(
-    String label, {
-    required bool selected,
-    required VoidCallback onTap,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        margin: const EdgeInsets.only(right: 6),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        decoration: BoxDecoration(
-          color: selected ? AppColors.ink : AppColors.paper2,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: AppColors.border),
-        ),
-        child: Text(
-          label,
-          style: AppTextStyles.label(
-            selected ? AppColors.paper : AppColors.ink,
+// ── Expanded state ──────────────────────────────────────────────────────────
+class _ExpandedBar extends StatelessWidget {
+  final int dur;
+  final String mood;
+  final String purp;
+  final bool showCustom;
+  final String custom;
+  final AppThemeTokens t;
+  final VoidCallback onToggleOptions;
+  final VoidCallback onSwap;
+  final ValueChanged<int> onDurChanged;
+  final ValueChanged<String> onMoodChanged;
+  final ValueChanged<String> onPurpChanged;
+  final VoidCallback onToggleCustom;
+  final ValueChanged<String> onCustomChanged;
+
+  const _ExpandedBar({
+    required this.dur,
+    required this.mood,
+    required this.purp,
+    required this.showCustom,
+    required this.custom,
+    required this.t,
+    required this.onToggleOptions,
+    required this.onSwap,
+    required this.onDurChanged,
+    required this.onMoodChanged,
+    required this.onPurpChanged,
+    required this.onToggleCustom,
+    required this.onCustomChanged,
+  });
+
+  static const _presets = [10, 20, 30, 45, 60];
+  static const _moods = ['고요', '활기', '즉흥'];
+  static const _purps = ['회복', '환기', '사색', '탐험'];
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: t.paper2,
+        border: Border.all(color: t.ruleSoft),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Section: 얼마나
+          Row(
+            children: [
+              Text('얼마나', style: Ts.sans(12, FontWeight.w600, t.ink3)),
+              const Spacer(),
+              GestureDetector(
+                onTap: onToggleCustom,
+                child: Text(
+                  showCustom ? '프리셋' : '직접 입력',
+                  style: Ts.sans(12, FontWeight.w600, t.copperD),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          if (!showCustom)
+            Row(
+              children: _presets
+                  .map((d) => _MinPill(
+                        label: '$d분',
+                        active: dur == d,
+                        t: t,
+                        onTap: () => onDurChanged(d),
+                      ))
+                  .toList(),
+            )
+          else
+            _CustomInput(
+              value: custom,
+              t: t,
+              onChanged: onCustomChanged,
+            ),
+
+          // Divider
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            child: _DashedDivider(color: t.ruleSoft),
+          ),
+
+          // Section: 마음
+          Text('마음', style: Ts.sans(12, FontWeight.w600, t.ink3)),
+          const SizedBox(height: 8),
+          Row(
+            children: _moods
+                .map((m) => _ChipRadio(
+                      label: m,
+                      active: mood == m,
+                      t: t,
+                      onTap: () => onMoodChanged(m),
+                    ))
+                .toList(),
+          ),
+
+          // Divider
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            child: _DashedDivider(color: t.ruleSoft),
+          ),
+
+          // Section: 목적
+          Text('목적', style: Ts.sans(12, FontWeight.w600, t.ink3)),
+          const SizedBox(height: 8),
+          Row(
+            children: _purps
+                .map((p) => _ChipRadio(
+                      label: p,
+                      active: purp == p,
+                      t: t,
+                      onTap: () => onPurpChanged(p),
+                    ))
+                .toList(),
+          ),
+
+          // Bottom actions
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            child: _DashedDivider(color: t.ruleSoft),
+          ),
+          Row(
+            children: [
+              GestureDetector(
+                onTap: onSwap,
+                child: Text(
+                  '↻ 다른 길',
+                  style: Ts.sans(13, FontWeight.w700, t.copperD),
+                ),
+              ),
+              const Spacer(),
+              GestureDetector(
+                onTap: onToggleOptions,
+                child: Text(
+                  '접기',
+                  style: Ts.sans(13, FontWeight.w600, t.ink3),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── MinPill ─────────────────────────────────────────────────────────────────
+class _MinPill extends StatelessWidget {
+  final String label;
+  final bool active;
+  final AppThemeTokens t;
+  final VoidCallback onTap;
+
+  const _MinPill({
+    required this.label,
+    required this.active,
+    required this.t,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: GestureDetector(
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          height: 42,
+          margin: const EdgeInsets.only(right: 4),
+          decoration: BoxDecoration(
+            color: active ? t.ink : t.paper2,
+            border: Border.all(color: active ? t.ink : t.rule),
+            borderRadius: BorderRadius.circular(4),
+          ),
+          alignment: Alignment.center,
+          child: Text(
+            label,
+            style: Ts.sans(13, FontWeight.w600,
+                active ? t.paper : t.ink),
           ),
         ),
       ),
     );
   }
-
-  Widget _divider() => Container(
-    width: 1,
-    height: 20,
-    color: AppColors.border,
-  );
-
-  String _moodLabel(String m) =>
-    const {'quiet': '고요', 'lively': '활기', 'spontaneous': '즉흥'}[m]!;
-
-  String _purposeLabel(String p) => const {
-    'recovery': '회복',
-    'clearing': '환기',
-    'reflection': '사색',
-    'exploration': '탐험'
-  }[p]!;
 }
 
-class _CustomDurationChip extends StatefulWidget {
-  final int duration;
-  final ValueChanged<int> onChanged;
+// ── ChipRadio ───────────────────────────────────────────────────────────────
+class _ChipRadio extends StatelessWidget {
+  final String label;
+  final bool active;
+  final AppThemeTokens t;
+  final VoidCallback onTap;
 
-  const _CustomDurationChip({
-    required this.duration,
+  const _ChipRadio({
+    required this.label,
+    required this.active,
+    required this.t,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        margin: const EdgeInsets.only(right: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+        decoration: BoxDecoration(
+          color: active ? t.ink : Colors.transparent,
+          border: Border.all(color: active ? t.ink : t.rule),
+          borderRadius: BorderRadius.circular(99),
+        ),
+        child: Text(
+          label,
+          style: Ts.sans(13, FontWeight.w500,
+              active ? t.paper : t.ink),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Custom input ─────────────────────────────────────────────────────────────
+class _CustomInput extends StatefulWidget {
+  final String value;
+  final AppThemeTokens t;
+  final ValueChanged<String> onChanged;
+
+  const _CustomInput({
+    required this.value,
+    required this.t,
     required this.onChanged,
   });
 
   @override
-  State<_CustomDurationChip> createState() => _CustomDurationChipState();
+  State<_CustomInput> createState() => _CustomInputState();
 }
 
-class _CustomDurationChipState extends State<_CustomDurationChip> {
-  bool _editing = false;
-  late TextEditingController _ctrl;
-
-  bool get _isCustom => ![5, 10, 15, 20, 30].contains(widget.duration);
+class _CustomInputState extends State<_CustomInput> {
+  late final TextEditingController _ctrl;
 
   @override
   void initState() {
     super.initState();
-    _ctrl = TextEditingController();
+    _ctrl = TextEditingController(text: widget.value);
   }
 
   @override
@@ -131,45 +414,61 @@ class _CustomDurationChipState extends State<_CustomDurationChip> {
 
   @override
   Widget build(BuildContext context) {
-    if (_editing) {
-      return SizedBox(
-        width: 60,
-        child: TextField(
-          controller: _ctrl,
-          autofocus: true,
-          keyboardType: TextInputType.number,
-          style: AppTextStyles.label(AppColors.ink),
-          onSubmitted: (v) {
-            final n = int.tryParse(v);
-            if (n != null && n >= 3 && n <= 60) {
-              widget.onChanged(n);
-            }
-            setState(() => _editing = false);
-          },
+    return TextField(
+      controller: _ctrl,
+      autofocus: true,
+      keyboardType: TextInputType.number,
+      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+      style: Ts.sans(15, FontWeight.w400, widget.t.ink),
+      decoration: InputDecoration(
+        hintText: '분 단위 입력 (3–60)',
+        hintStyle: Ts.sans(14, FontWeight.w400, widget.t.ink3),
+        enabledBorder: UnderlineInputBorder(
+          borderSide: BorderSide(color: widget.t.ink, width: 1.5),
         ),
-      );
-    }
-    return GestureDetector(
-      onTap: () {
-        _ctrl.clear();
-        setState(() => _editing = true);
-      },
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        margin: const EdgeInsets.only(right: 6),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        decoration: BoxDecoration(
-          color: _isCustom ? AppColors.ink : AppColors.paper2,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: AppColors.border),
+        focusedBorder: UnderlineInputBorder(
+          borderSide: BorderSide(color: widget.t.ink, width: 1.5),
         ),
-        child: Text(
-          _isCustom ? '${widget.duration}분' : '직접',
-          style: AppTextStyles.label(
-            _isCustom ? AppColors.paper : AppColors.ink,
-          ),
-        ),
+        isDense: true,
+        contentPadding: const EdgeInsets.only(bottom: 4),
       ),
+      onChanged: widget.onChanged,
     );
   }
+}
+
+// ── Dashed divider ───────────────────────────────────────────────────────────
+class _DashedDivider extends StatelessWidget {
+  final Color color;
+
+  const _DashedDivider({required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return CustomPaint(
+      size: const Size(double.infinity, 1),
+      painter: _DashedPainter(color: color),
+    );
+  }
+}
+
+class _DashedPainter extends CustomPainter {
+  final Color color;
+  const _DashedPainter({required this.color});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = 1;
+    const dashW = 4.0, gapW = 4.0;
+    double x = 0;
+    while (x < size.width) {
+      canvas.drawLine(Offset(x, 0), Offset(x + dashW, 0), paint);
+      x += dashW + gapW;
+    }
+  }
+
+  @override
+  bool shouldRepaint(_DashedPainter old) => old.color != color;
 }

@@ -4,37 +4,56 @@ import 'package:motungi/screens/home/widgets/option_bar.dart';
 import 'package:motungi/theme/app_theme.dart';
 
 void main() {
-  testWidgets('OptionBar shows duration chips', (tester) async {
-    int selected = 15;
+  testWidgets('AdjustBar collapsed shows summary and swap button', (tester) async {
     await tester.pumpWidget(MaterialApp(
       theme: buildTheme(),
-      home: Scaffold(body: OptionBar(
-        duration: selected,
-        mood: 'quiet',
-        purpose: 'recovery',
-        onDurationChanged: (v) => selected = v,
-        onMoodChanged: (_) {},
-        onPurposeChanged: (_) {},
-      )),
+      home: Scaffold(
+        body: AdjustBar(
+          dur: 20,
+          mood: '활기',
+          purp: '회복',
+          showOptions: false,
+          showCustom: false,
+          custom: '',
+          onToggleOptions: () {},
+          onSwap: () {},
+          onDurChanged: (_) {},
+          onMoodChanged: (_) {},
+          onPurpChanged: (_) {},
+          onToggleCustom: () {},
+          onCustomChanged: (_) {},
+        ),
+      ),
     ));
-    expect(find.text('15분'), findsOneWidget);
-    expect(find.text('30분'), findsOneWidget);
+    expect(find.text('조정→'), findsOneWidget);
+    expect(find.text('↻'), findsOneWidget);
   });
 
-  testWidgets('tapping duration chip calls onDurationChanged', (tester) async {
-    int changed = 0;
+  testWidgets('AdjustBar expanded shows mood chips', (tester) async {
     await tester.pumpWidget(MaterialApp(
       theme: buildTheme(),
-      home: Scaffold(body: OptionBar(
-        duration: 15,
-        mood: 'quiet',
-        purpose: 'recovery',
-        onDurationChanged: (v) => changed = v,
-        onMoodChanged: (_) {},
-        onPurposeChanged: (_) {},
-      )),
+      home: Scaffold(
+        body: SingleChildScrollView(
+          child: AdjustBar(
+            dur: 20,
+            mood: '활기',
+            purp: '회복',
+            showOptions: true,
+            showCustom: false,
+            custom: '',
+            onToggleOptions: () {},
+            onSwap: () {},
+            onDurChanged: (_) {},
+            onMoodChanged: (_) {},
+            onPurpChanged: (_) {},
+            onToggleCustom: () {},
+            onCustomChanged: (_) {},
+          ),
+        ),
+      ),
     ));
-    await tester.tap(find.text('30분'));
-    expect(changed, 30);
+    expect(find.text('고요'), findsOneWidget);
+    expect(find.text('활기'), findsOneWidget);
+    expect(find.text('즉흥'), findsOneWidget);
   });
 }
