@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; overflow: hidden; background: #f0ebe0; }
+
+    /* 애니풍 화풍 필터 */
+    #map-outer {
+      width: 100%;
+      height: 100%;
+      filter: saturate(0.58) sepia(0.22) hue-rotate(8deg) brightness(1.09) contrast(0.90);
+    }
+    #map { width: 100%; height: 100%; }
+
+    /* 로딩 화면 */
+    #loading {
+      position: absolute; inset: 0;
+      display: flex; align-items: center; justify-content: center;
+      background: #f0ebe0;
+      font-family: sans-serif; font-size: 13px; color: #8a7f70;
+      z-index: 10;
+    }
+  </style>
+</head>
+<body>
+  <div id="loading">지도 불러오는 중…</div>
+  <div id="map-outer">
+    <div id="map"></div>
+  </div>
+
+  <script>
+    var map = null;
+    var currentMarker = null;
+    var polyline = null;
+    var pathCoords = [];
+
+    // Flutter → iframe postMessage 수신
+    window.addEventListener('message', function(e) {
+      var d = e.data;
+      if (!d || !d.type) return;
+      if (d.type === 'init')           initMap(d.lat, d.lng, d.level);
+      if (d.type === 'updatePosition') updatePosition(d.lat, d.lng);
+      if (d.type === 'clearPath')      clearPath();
+    });
+
+    // Android JavascriptChannel 수신
+    window.FlutterBridge = {
+      onMessage: function(json) {
+        var d = JSON.parse(json);
+        window.dispatchEvent(new MessageEvent('message', { data: d }));
+      }
+    };
+
+    function initMap(lat, lng, level) {
+      lat   = lat   != null ? lat   : 37.5665;
+      lng   = lng   != null ? lng   : 126.9780;
+      level = level != null ? level : 4;
+
+      var container = document.getElementById('map');
+      map = new kakao.maps.Map(container, {
+        center: new kakao.maps.LatLng(lat, lng),
+        level: level,
+        mapTypeId: kakao.maps.MapTypeId.ROADMAP
+      });
+      map.setZoomable(false);
+
+      document.getElementById('loading').style.display = 'none';
+      postToFlutter({ type: 'ready' });
+    }
+
+    function updatePosition(lat, lng) {
+      if (!map) return;
+      var latlng = new kakao.maps.LatLng(lat, lng);
+      map.panTo(latlng);
+
+      if (!currentMarker) {
+        currentMarker = new kakao.maps.Marker({ position: latlng, map: map });
+      } else {
+        currentMarker.setPosition(latlng);
+      }
+
+      pathCoords.push(latlng);
+      if (polyline) polyline.setMap(null);
+      polyline = new kakao.maps.Polyline({
+        map: map,
+        path: pathCoords,
+        strokeWeight: 4,
+        strokeColor: '#92AEC2',
+        strokeOpacity: 0.92,
+        strokeStyle: 'solid'
+      });
+    }
+
+    function clearPath() {
+      pathCoords = [];
+      if (polyline) { polyline.setMap(null); polyline = null; }
+      if (currentMarker) { currentMarker.setMap(null); currentMarker = null; }
+    }
+
+    function postToFlutter(data) {
+      // iframe → Flutter (web)
+      if (window.parent !== window) window.parent.postMessage(data, '*');
+      // WebView → Flutter (android)
+      if (window.FlutterChannel) window.FlutterChannel.postMessage(JSON.stringify(data));
+    }
+
+    // 카카오맵 SDK 동적 로드
+    (function() {
+      var s = document.createElement('script');
+      s.type = 'text/javascript';
+      s.src = 'https://dapi.kakao.com/v2/maps/sdk.js?appkey=23c616fbec3077af33e45eee4faceb07&autoload=false';
+      s.onload = function() {
+        kakao.maps.load(function() { initMap(); });
+      };
+      s.onerror = function(e) {
+        document.getElementById('loading').textContent = 'SDK 로드 실패: ' + (e.message || 'network error');
+      };
+      document.head.appendChild(s);
+    })();
+  </script>
+</body>
+</html>

@@ -34,6 +34,8 @@ dependencies:
   flutter_riverpod: ^2.5.1
   supabase_flutter: ^2.5.0
   webview_flutter: ^4.8.0
+  flutter_map: ^8.1.1
+  latlong2: ^0.9.1
   google_fonts: ^6.2.1
   sign_in_with_apple: ^6.1.0
   google_sign_in: ^6.2.1
@@ -60,6 +62,7 @@ flutter:
 
   assets:
     - assets/fonts/
+    - assets/map/
 
   fonts:
     - family: GowunBatang
