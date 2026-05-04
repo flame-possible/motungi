@@ -1,22 +1,32 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 // ── Ts — primary text style helper ─────────────────────────────────────────
-// Gowun Batang = serif (headlines)
-// Gowun Dodum  = sans / body
+// GowunBatang = serif (headlines)
+// GowunDodum  = sans / body
+// Both are bundled as local assets (assets/fonts/) to avoid runtime network fetching.
 
 class Ts {
   static TextStyle serif(double size, FontWeight weight, Color color,
       {double? height, double? letterSpacing}) =>
-    GoogleFonts.gowunBatang(
-        fontSize: size, fontWeight: weight, color: color,
-        height: height, letterSpacing: letterSpacing);
+    TextStyle(
+      fontFamily: 'GowunBatang',
+      fontSize: size,
+      fontWeight: weight,
+      color: color,
+      height: height,
+      letterSpacing: letterSpacing,
+    );
 
   static TextStyle sans(double size, FontWeight weight, Color color,
       {double? height, double? letterSpacing}) =>
-    GoogleFonts.gowunDodum(
-        fontSize: size, fontWeight: weight, color: color,
-        height: height, letterSpacing: letterSpacing);
+    TextStyle(
+      fontFamily: 'GowunDodum',
+      fontSize: size,
+      fontWeight: weight,
+      color: color,
+      height: height,
+      letterSpacing: letterSpacing,
+    );
 }
 
 // ── Legacy aliases (kept for compatibility) ────────────────────────────────
