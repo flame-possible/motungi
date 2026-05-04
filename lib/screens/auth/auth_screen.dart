@@ -42,8 +42,33 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
     }
   }
 
-  void _social(String provider) {
-    // TODO Phase 6: 소셜 OAuth 연결
+  void _social(String provider) async {
+    try {
+      if (provider == 'apple') {
+        // Apple 로그인은 sign_in_with_apple 패키지 필요 (iOS 전용)
+        // TODO: iOS 빌드 시 sign_in_with_apple 패키지 연결
+      } else if (provider == 'google') {
+        await SupabaseService.client.auth.signInWithOAuth(
+          OAuthProvider.google,
+          redirectTo: 'com.motungi://login-callback',
+        );
+      } else if (provider == 'kakao') {
+        // 카카오 OAuth 플로우
+        // 1. 카카오 인증 후 액세스 토큰 획득
+        // 2. Edge Function 호출하여 Supabase 세션 획득
+        // TODO: flutter_web_auth_2로 카카오 OAuth 구현
+        // const kakaoAppKey = String.fromEnvironment('KAKAO_APP_KEY', defaultValue: '');
+        // if (kakaoAppKey.isEmpty) return;
+        // final result = await FlutterWebAuth2.authenticate(
+        //   url: 'https://kauth.kakao.com/oauth/authorize?client_id=$kakaoAppKey&redirect_uri=motungi://auth&response_type=code',
+        //   callbackUrlScheme: 'motungi',
+        // );
+      }
+    } on AuthException catch (e) {
+      setState(() => _err = e.message);
+    } catch (_) {
+      // Supabase 미연결 상태에서는 무시
+    }
   }
 
   @override
