@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../services/supabase_service.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_text_styles.dart';
 
@@ -22,11 +24,22 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
   bool get _validPw    => _pw.length >= 8;
   bool get _canSubmit  => _validEmail && _validPw && (!_isSignup || _agreed);
 
-  void _submit() {
+  void _submit() async {
     if (!_validEmail) { setState(() => _err = '이메일 형식을 확인해 주세요.'); return; }
     if (!_validPw)    { setState(() => _err = '비밀번호는 8자 이상이어야 해요.'); return; }
     if (_isSignup && !_agreed) { setState(() => _err = '약관에 동의해 주세요.'); return; }
-    // TODO Phase 6: Supabase auth 연결
+    try {
+      final client = SupabaseService.client;
+      if (_isSignup) {
+        await client.auth.signUp(email: _email, password: _pw, data: {'nickname': _name});
+      } else {
+        await client.auth.signInWithPassword(email: _email, password: _pw);
+      }
+    } on AuthException catch (e) {
+      setState(() => _err = e.message);
+    } catch (_) {
+      // Supabase 미연결 상태에서는 무시
+    }
   }
 
   void _social(String provider) {

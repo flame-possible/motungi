@@ -1,11 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'services/supabase_service.dart';
 import 'screens/home/home_screen.dart';
 import 'screens/log/log_screen.dart';
 import 'theme/app_colors.dart';
 import 'theme/app_theme.dart';
 
-void main() => runApp(const ProviderScope(child: MotungiApp()));
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  const supabaseUrl = String.fromEnvironment('SUPABASE_URL', defaultValue: '');
+  const supabaseKey = String.fromEnvironment('SUPABASE_ANON_KEY', defaultValue: '');
+  if (supabaseUrl.isNotEmpty && supabaseKey.isNotEmpty) {
+    await SupabaseService.init(url: supabaseUrl, anonKey: supabaseKey);
+  }
+  runApp(const ProviderScope(child: MotungiApp()));
+}
 
 class MotungiApp extends StatelessWidget {
   const MotungiApp({super.key});
